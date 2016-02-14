@@ -111,6 +111,7 @@ func (app ConsoleAppender) StartListening(l *Logger) {
 			log.Println(msg)
 		case <-app.quit:
 			l.wg.Done()
+			return
 		}
 	}
 }
