@@ -1,3 +1,9 @@
+/*
+Package alog implements an asynchronous logger.
+
+Basic appenders are included, but the package is designed
+to be extended with extra appenders.
+*/
 package alog
 
 import (
@@ -7,23 +13,30 @@ import (
 
 ////////////// Logger
 
-var wg sync.WaitGroup
-
 // A Logger. Is defined by a name and can be linked with multiple appenders
 type Logger struct {
 	name      string
-	appenders []*Appender
+	appenders []Appender
 	listener  chan string
 	wg        sync.WaitGroup
+	quit      chan int
 }
 
-func (logger *Logger) Finalize() {
-	logger.wg.Wait()
-}
-
-func NewLogger(name string) *Logger {
-	logger := &Logger{name, nil, make(chan string), wg}
-	logger.AddAppender(&ConsoleAppender{make(chan string), logger.wg})
+func NewLogger(name string, appenders []Appender) *Logger {
+	logger := new(Logger)
+	logger.name = name
+	logger.appenders = make([]Appender, 0)
+	logger.listener = make(chan string) // TODO the channel needs to be closed
+	logger.quit = make(chan int)
+	for _, appender := range appenders {
+		logger.AddAppender(appender)
+	}
+	//for _, appender := range logger.appenders {
+	//	logger.wg.Add(1)
+	//	go appender.StartListening(logger)
+	//}
+	logger.wg.Add(1)
+	go logger.DispatchMessages()
 	return logger
 }
 
@@ -39,24 +52,37 @@ const (
 
 func (logger *Logger) DispatchMessages() {
 	//log.Println("Dispatching message: getting it from logger.listener")
-	msg := <-logger.listener
-	for _, appender := range logger.appenders {
-		logger.wg.Add(1)
-		(*appender).Append(msg)
+	for {
+		select {
+		case msg := <-logger.listener:
+			for _, appender := range logger.appenders {
+				appender.Append(msg)
+			}
+		case <-logger.quit:
+			logger.wg.Done()
+			return
+		}
+		//logger.wg.Done()
 	}
 }
 
-func (l *Logger) Println(msg string, level Level) {
-	//log.Println("Putting new message in the queue. " + msg)
-	go l.DispatchMessages()
-	l.listener <- msg
+func (l *Logger) Finalize() {
+	l.quit <- 1
+	for _, app := range l.appenders {
+		app.Finalize()
+	}
 	l.wg.Wait()
 }
 
+func (l *Logger) Log(msg string, level Level) {
+	//log.Println("Putting new message in the queue. " + msg)
+	l.listener <- msg
+}
+
 func (l *Logger) AddAppender(app Appender) {
-	go app.StartListening()
-	l.appenders = append(l.appenders, &app)
-	// Start a goroutine for this appender to print logs
+	l.appenders = append(l.appenders, app)
+	l.wg.Add(1)
+	go app.StartListening(l)
 }
 
 ///////////// Appender
@@ -66,26 +92,35 @@ func (l *Logger) AddAppender(app Appender) {
 // ready to be logged by the logging routine.
 type Appender interface {
 	Append(msg string)
-	StartListening()
+	StartListening(l *Logger)
+	Finalize()
 }
 
 // A console appender.
 type ConsoleAppender struct {
-	messageQueue chan string
-	wg           sync.WaitGroup
+	MessageQueue chan string
+	quit         chan int
 }
 
 // Listen forever for log events
-func (app *ConsoleAppender) StartListening() {
+func (app ConsoleAppender) StartListening(l *Logger) {
 	for {
-		//log.Println("Picking a message from the queue")
-		msg := <-app.messageQueue
-		log.Println(msg)
-		app.wg.Done()
+		select {
+		case msg := <-app.MessageQueue:
+			//log.Println("Picking a message from the queue")
+			log.Println(msg)
+		case <-app.quit:
+			l.wg.Done()
+		}
 	}
 }
 
-func (app *ConsoleAppender) Append(msg string) {
+func (app ConsoleAppender) Append(msg string) {
 	//log.Println("Putting a message in the appender queue " + msg)
-	app.messageQueue <- msg
+	app.MessageQueue <- msg
+}
+
+// Finalize triggers the end of the logging loop
+func (app ConsoleAppender) Finalize() {
+	app.quit <- 1
 }
