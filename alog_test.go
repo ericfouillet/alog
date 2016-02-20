@@ -1,6 +1,9 @@
 package alog
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 // A test appender that adds messages to a list
 type TestAppender struct {
@@ -42,5 +45,11 @@ func TestLogger(t *testing.T) {
 		t.Fail()
 	}
 	logger.Log("Test message", INFO)
+	if len(appender.logs) != 1 {
+		t.Fail()
+	}
+	if strings.Compare(appender.logs[0], "Test message") != 0 {
+		t.Fail()
+	}
 	logger.Finalize()
 }
