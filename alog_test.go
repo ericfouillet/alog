@@ -3,6 +3,7 @@ package alog
 import (
 	"strings"
 	"testing"
+	"time"
 )
 
 // A test appender that adds messages to a list
@@ -45,6 +46,8 @@ func TestLogger(t *testing.T) {
 		t.Fail()
 	}
 	logger.Log("Test message", INFO)
+	// Wait a reasonable time for the message to be logged
+	time.Sleep(100 * time.Millisecond)
 	if len(appender.logs) != 1 {
 		t.Fail()
 	}
