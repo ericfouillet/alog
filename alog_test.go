@@ -33,6 +33,7 @@ func (app *TestAppender) Append(msg string) {
 func (app *TestAppender) Finalize() {
 	app.quit <- 1
 }
+
 func TestLogger(t *testing.T) {
 	var appender TestAppender
 	appender.MessageQueue = make(chan string)
@@ -47,7 +48,7 @@ func TestLogger(t *testing.T) {
 	}
 	logger.Log("Test message", INFO)
 	// Wait a reasonable time for the message to be logged
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(50 * time.Millisecond)
 	if len(appender.logs) != 1 {
 		t.Fail()
 	}
