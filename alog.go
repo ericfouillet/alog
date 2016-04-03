@@ -20,7 +20,7 @@ func NewLogger(name string, appenders []Appender) *Logger {
 	logger := new(Logger)
 	logger.name = name
 	logger.appenders = make([]Appender, 0)
-	logger.listener = make(chan string) // TODO the channel needs to be closed
+	logger.listener = make(chan string) // TODO close the channel
 	logger.quit = make(chan int)
 	for _, appender := range appenders {
 		logger.AddAppender(appender)
@@ -34,9 +34,9 @@ type Level int
 
 const (
 	INFO  Level = iota
-	DEBUG Level = iota
-	WARN  Level = iota
-	ERROR Level = iota
+	DEBUG Level
+	WARN  Level
+	ERROR Level
 )
 
 func (logger *Logger) DispatchMessages() {
